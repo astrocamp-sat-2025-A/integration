@@ -2,12 +2,25 @@
 #include <string.h> 
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
+#include "hardware/uart.h"
+#include "hardware/pwm.h"
 
 // TCP/IP (lwIP) のためのヘッダー
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
 
 #define TCP_PORT 80
+
+//NOTE: UART用のPIN
+#define UART_ID uart0
+#define BAUD_RATE 115200
+
+//NOTE: UART用のPIN(書き込み装置使用時)
+#define UART_TX_PIN 12
+#define UART_RX_PIN 13
+
+//NOTE: PWM用のPIN
+#define PWM_PIN 11
 
 // Wi-Fiの認証情報
 char ssid[] = "SPWH_L12_af31f5";
@@ -135,6 +148,46 @@ void start_wifi_web_server(void) {
  */
 int main() {
     stdio_init_all();
+
+    //NOTE: UARTの初期化
+    uart_init(UART_ID, BAUD_RATE);
+    gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
+    gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
+
+    uart_puts(UART_ID, " Hello, UART!\n");
+
+    gpio_set_function(PWM_PIN, GPIO_FUNC_PWM);
+
+
+    //NOTE: PWMの初期化
+    // 指定したGPIOピンが接続されているPWMスライス番号を取得
+    uint slice_num = pwm_gpio_to_slice_num(PWM_PIN);
+
+    // --- 周波数設定 (50Hz) ---
+    // 1. クロック分周比を設定 (125.0f)
+    // システムクロック(125MHz)を125で分周 -> 1MHzのPWMカウンタークロック
+    // これにより、1カウントが1マイクロ秒(µs)になります。
+    pwm_set_clkdiv(slice_num, 125.0f);
+
+    // 2. ラップ値を設定 (19999)
+    // 周期が20000カウント = 20000µs = 20ms となり、周波数が50Hzになります。
+    uint16_t wrap_value = 19999;
+    pwm_set_wrap(slice_num, wrap_value);
+
+    // 目標のデューティ比からレベル値を計算
+    uint16_t level_cw_per = 4;  // NOTE: 目標duty比4%
+    uint16_t level_cw_per_ver2 = 6; // NOTE: 目標duty比10%
+    uint16_t level_stop_per = 8; // NOTE: 目標duty比10%
+    uint16_t level_ccw_per = 10; // NOTE: 目標duty比10%
+
+    // (19999 + 1) * 4 / 100 = 800
+    uint16_t level_cw = (wrap_value + 1) * level_cw_per / 100;
+    uint16_t level_cw_ver2 = (wrap_value + 1) * level_cw_per_ver2 / 100;
+    uint16_t level_stop = (wrap_value + 1) * level_stop_per / 100;
+    // (19999 + 1) * 10 / 100 = 2000
+    uint16_t level_ccw = (wrap_value + 1) * level_ccw_per / 100;
+
+    //NOTE: Wi-Fiの初期化
     start_wifi_web_server();
     // メインの無限ループ
     while (true) {
@@ -143,7 +196,8 @@ int main() {
             // --- ここに「ボタンが押された後」にPicoで実行したい処理を書く ---
             printf("Main loop detected button signal!\n");
             // (例: LEDを点滅させる、モーターを動かす など)
-            // ---
+            //NOTE: LEDの点滅
+            /*
             cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
             sleep_ms(1000);
             cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
@@ -152,6 +206,23 @@ int main() {
             sleep_ms(1000);
             cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
             // 処理が終わったら、フラグを 0 に戻し、次の信号を待つ
+            */
+
+            //NOTE: PWMの動作
+            printf("PICO-PWM-CW\n");
+            pwm_set_enabled(slice_num, true);
+            // 計算したlevel_cw (800) を設定 -> パルス幅800µs
+            pwm_set_chan_level(slice_num, PWM_CHAN_B, level_cw);
+            sleep_ms(5000);
+    
+            printf("PICO-PWM-CCW\n");
+            pwm_set_chan_level(slice_num, PWM_CHAN_B, level_cw_ver2);
+            sleep_ms(5000);
+    
+            printf("PICO-PWM-STOP\n");
+            pwm_set_enabled(slice_num, false);
+            sleep_ms(5000);
+            
             g_web_signal_received = 0;
         }
 
