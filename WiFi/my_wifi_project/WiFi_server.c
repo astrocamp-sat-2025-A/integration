@@ -34,7 +34,9 @@ volatile int g_web_signal_received = 0;
  * [コールバック関数 1] クライアントからデータを受信した時
  */
 static err_t tcp_server_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
+
     char request_buffer[128];
+
     if (p != NULL) {
         // --- リクエスト内容の解析 ---
         if (p->len < sizeof(request_buffer) - 1) {
@@ -45,16 +47,25 @@ static err_t tcp_server_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pb
             request_buffer[sizeof(request_buffer) - 1] = '\0';
         }
 
-        //リクエスト
-        if (strstr(request_buffer, "GET /a")) {
-            // シリアルモニタに 'get a' を出力
-            printf("get a\n"); 
-            
-            // グローバル関数の設定　このフラグが1の時にメインを動かす
-            // メインループに「ボタンが押された」ことを伝えるため、フラグを 1 にセットする
-            g_web_signal_received = 1;
+        if (strstr(request_buffer, "GET /push1")) {
+            // PUSH1 が押された
+            printf("get push1\n"); 
+            g_web_signal_received = 1; // フラグに「1」をセット
+
+        } else if (strstr(request_buffer, "GET /push2")) {
+            // PUSH2 が押された
+            printf("get push2\n"); 
+            g_web_signal_received = 2; // フラグに「2」をセット
+
+        } else if (strstr(request_buffer, "GET /push3")) {
+            // PUSH3 が押された
+            printf("get push3\n"); 
+            g_web_signal_received = 3; // フラグに「3」をセット
         
-        } else {}
+        } else {
+            // それ以外 (ルート "/" へのアクセスなど)
+            printf("Root access or unknown request.\n");
+        }
         
         // --- レスポンスの送信 ---
         tcp_recved(tpcb, p->tot_len);
@@ -69,7 +80,9 @@ static err_t tcp_server_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pb
             "<h1>Ground Station</h1>"
             "<p>Take the picture of the earth!</p>"
             "<br>"
-            "<a href=\"/a\"><button style=\"font-size: 20px; padding: 10px;\">PUSH!</button></a>"
+            "<a href=\"/push1\"><button style=\"font-size: 20px; padding: 10px;\">PUSH1!</button></a>"
+            "<a href=\"/push2\"><button style=\"font-size: 20px; padding: 10px;\">PUSH2!</button></a>"
+            "<a href=\"/push3\"><button style=\"font-size: 20px; padding: 10px;\">PUSH3!</button></a>"
             "</body></html>";
 
         cyw43_arch_lwip_check();
@@ -190,42 +203,46 @@ int main() {
     //NOTE: Wi-Fiの初期化
     start_wifi_web_server();
     // メインの無限ループ
-    while (true) {
+     while (true) {
+        // ネットワークスタックを動かし続けるために必須 (絶対にループから外したり、長時間停止させないこと)
         cyw43_arch_poll();
-        if (g_web_signal_received == 1) {
-            // --- ここに「ボタンが押された後」にPicoで実行したい処理を書く ---
-            printf("Main loop detected button signal!\n");
-            // (例: LEDを点滅させる、モーターを動かす など)
-            //NOTE: LEDの点滅
-            /*
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-            sleep_ms(1000);
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-            sleep_ms(1000);
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-            sleep_ms(1000);
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-            // 処理が終わったら、フラグを 0 に戻し、次の信号を待つ
-            */
 
-            //NOTE: PWMの動作
-            printf("PICO-PWM-CW\n");
-            pwm_set_enabled(slice_num, true);
-            // 計算したlevel_cw (800) を設定 -> パルス幅800µs
-            pwm_set_chan_level(slice_num, PWM_CHAN_B, level_cw);
+        if (g_web_signal_received == 1) {
+            // --- PUSH1 (CW)が押された時の処理 ---
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+            sleep_ms(1000);
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+            sleep_ms(1000);
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+            sleep_ms(1000);
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+
+        } else if (g_web_signal_received == 2) {
+            // --- PUSH2 (CCW)が押された時の処理 ---
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+            sleep_ms(2000);
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+            sleep_ms(2000);
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+            sleep_ms(2000);
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+
+        } else if (g_web_signal_received == 3) {
+            // --- PUSH3 (STOP)が押された時の処理 ---
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
             sleep_ms(5000);
-    
-            printf("PICO-PWM-CCW\n");
-            pwm_set_chan_level(slice_num, PWM_CHAN_B, level_cw_ver2);
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
             sleep_ms(5000);
-    
-            printf("PICO-PWM-STOP\n");
-            pwm_set_enabled(slice_num, false);
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
             sleep_ms(5000);
-            
-            g_web_signal_received = 0;
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
         }
 
-        sleep_ms(1);
+        // フラグが処理されたら(0以外だったら)、必ず0に戻す
+        if (g_web_signal_received != 0) {
+             g_web_signal_received = 0;
+        }
+
+        sleep_ms(1); // CPUを少し休ませる (この程度の短いsleepはOK)
     }
 }
