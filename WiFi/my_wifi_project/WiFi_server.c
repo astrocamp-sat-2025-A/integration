@@ -1,0 +1,160 @@
+#include <stdio.h>
+#include <string.h> 
+#include "pico/stdlib.h"
+#include "pico/cyw43_arch.h"
+
+// TCP/IP (lwIP) のためのヘッダー
+#include "lwip/pbuf.h"
+#include "lwip/tcp.h"
+
+#define TCP_PORT 80
+
+// Wi-Fiの認証情報
+char ssid[] = "SPWH_L12_af31f5";
+char pass[] = "1a73892d66094";
+
+// コールバック関数 (ネットワーク処理) と main ループの間で情報をやり取りするためのグローバル変数
+volatile int g_web_signal_received = 0;
+
+
+/**
+ * [コールバック関数 1] クライアントからデータを受信した時
+ */
+static err_t tcp_server_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
+    char request_buffer[128];
+    if (p != NULL) {
+        // --- リクエスト内容の解析 ---
+        if (p->len < sizeof(request_buffer) - 1) {
+            memcpy(request_buffer, p->payload, p->len);
+            request_buffer[p->len] = '\0';
+        } else {
+            memcpy(request_buffer, p->payload, sizeof(request_buffer) - 1);
+            request_buffer[sizeof(request_buffer) - 1] = '\0';
+        }
+
+        //リクエスト
+        if (strstr(request_buffer, "GET /a")) {
+            // シリアルモニタに 'get a' を出力
+            printf("get a\n"); 
+            
+            // グローバル関数の設定　このフラグが1の時にメインを動かす
+            // メインループに「ボタンが押された」ことを伝えるため、フラグを 1 にセットする
+            g_web_signal_received = 1;
+        
+        } else {}
+        
+        // --- レスポンスの送信 ---
+        tcp_recved(tpcb, p->tot_len);
+        pbuf_free(p);
+
+        const char http_response[] = 
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/html\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "<html><body>"
+            "<h1>Ground Station</h1>"
+            "<p>Take the picture of the earth!</p>"
+            "<br>"
+            "<a href=\"/a\"><button style=\"font-size: 20px; padding: 10px;\">PUSH!</button></a>"
+            "</body></html>";
+
+        cyw43_arch_lwip_check();
+        tcp_write(tpcb, http_response, sizeof(http_response) - 1, TCP_WRITE_FLAG_COPY); 
+        tcp_close(tpcb);
+
+    } else {
+        tcp_close(tpcb);
+    }
+    return ERR_OK;
+}
+
+/**
+ * [コールバック関数 2] 新しいクライアントが接続してきた時
+ */
+static err_t tcp_server_accept_callback(void *arg, struct tcp_pcb *new_pcb, err_t err) {
+    if (new_pcb == NULL) {
+        return ERR_VAL;
+    }
+    printf("Client connected from browser.\n");
+    tcp_recv(new_pcb, tcp_server_recv_callback); // データ受信時のコールバックを設定
+    return ERR_OK;
+}
+
+/**
+ * [セットアップ関数] TCPサーバーを開始する
+ */
+static void setup_tcp_server(void) {
+    struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
+    if (!pcb) { return; }
+
+    if (tcp_bind(pcb, IP_ADDR_ANY, TCP_PORT) != ERR_OK) {
+        printf("Failed to bind\n");
+        return;
+    }
+
+    pcb = tcp_listen(pcb);
+    if (!pcb) { return; }
+
+    printf("TCP Server is Listening on port %d\n", TCP_PORT);
+    tcp_accept(pcb, tcp_server_accept_callback); // 接続受付時のコールバックを設定
+}
+
+
+/**
+ * Wi-Fiの初期化、接続、Webサーバーの起動までを一つにまとめた関数
+ */
+void start_wifi_web_server(void) {
+    
+    // 1. Wi-Fiチップ (CYW43) を初期化
+    if (cyw43_arch_init()) {
+        printf("FAILED to initialise Wi-Fi chip\n");
+        return;
+    }
+    printf("Initialised.\n");
+
+    // 2. ステーションモード (STAモード) を有効化
+    cyw43_arch_enable_sta_mode();
+    printf("Connecting to Wi-Fi: %s ...\n", ssid);
+
+    // 3. Wi-Fiへの接続
+    if (cyw43_arch_wifi_connect_timeout_ms(ssid, pass, CYW43_AUTH_WPA2_AES_PSK, 30000)) {
+        printf("FAILED to connect Wifi.\n");
+    } else {
+        printf("Connected successfully Wifi.\n");
+        printf("My IP address is: %s\n", ip4addr_ntoa(netif_ip4_addr(netif_list))); 
+        
+        // 4. Webサーバーをセットアップ
+        setup_tcp_server();
+    }
+}
+
+
+/**
+ * --- メイン関数 ---
+ */
+int main() {
+    stdio_init_all();
+    start_wifi_web_server();
+    // メインの無限ループ
+    while (true) {
+        cyw43_arch_poll();
+        if (g_web_signal_received == 1) {
+            // --- ここに「ボタンが押された後」にPicoで実行したい処理を書く ---
+            printf("Main loop detected button signal!\n");
+            // (例: LEDを点滅させる、モーターを動かす など)
+            // ---
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+            sleep_ms(1000);
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+            sleep_ms(1000);
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+            sleep_ms(1000);
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+            // 処理が終わったら、フラグを 0 に戻し、次の信号を待つ
+            g_web_signal_received = 0;
+        }
+
+        sleep_ms(1);
+    }
+}
