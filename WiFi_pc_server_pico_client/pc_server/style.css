@@ -1,0 +1,49 @@
+/* ページ全体のスタイル */
+body {
+    font-family: sans-serif;
+    text-align: center;
+    margin-top: 50px;
+    background-color: #f4f4f9;
+}
+
+/* ボタンのスタイル */
+button {
+    font-size: 20px;
+    padding: 15px 30px;
+    cursor: pointer;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+}
+
+/* ボタンにマウスを乗せた時のスタイル */
+button:hover {
+    background-color: #0056b3;
+}
+
+/* ステータス表示部分のスタイル */
+#status {
+    margin-top: 20px;
+    font-size: 18px;
+    color: #555;
+}
+.counter-box {
+    margin-top: 30px;
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    display: inline-block;
+    background-color: white;
+}
+.counter-box h2 {
+    margin: 0 0 10px 0;
+    color: #333;
+}
+.counter-box p {
+    font-size: 48px;
+    font-weight: bold;
+    color: #007bff;
+    margin: 0;
+}
