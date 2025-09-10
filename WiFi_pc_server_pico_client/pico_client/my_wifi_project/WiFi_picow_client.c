@@ -6,6 +6,9 @@
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
 
+#include "SunSensor.h"
+#include "pwm.h"
+
 // =================================================================
 // --- User Settings ---
 // =================================================================
@@ -22,6 +25,10 @@ volatile int g_start_blink_flag = 0;
 int g_total_blink_count = 0;
 // Persistent connection handle (PCB) for the data channel
 struct tcp_pcb *g_data_pcb = NULL;
+
+
+//NOTE: 光源と目標物の角度の変数
+float sun_angle_from_target = 0;
 
 
 // =================================================================
@@ -132,20 +139,53 @@ int main() {
         if (g_start_blink_flag) {
             printf("MAIN_LOOP: Flag detected! Starting LED blink session.\n");
 
-            // Blink the onboard LED 5 times
-            for (int i = 0; i < 5; i++) {
-                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-                sleep_ms(200);
-                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-                sleep_ms(200);
+            //NOTE: 任意の処理をここに書く
 
-                // Increment total count
-                g_total_blink_count++;
+            printf("MAIN_LOOP: 太陽センサのデータを取得\n");
+            uint16_t sunSensor_data[4] = {0, 0, 0, 0};
+            for(int i = 0; i < 4; i++){
+                sunSensor_data[i] = sunSensor_read(i);
+            }
+
+            //NOTE: 光源と現在位置の角度を取得
+            //TODO: 角度の基準正しいか？
+            printf("MAIN_LOOP: 光源と現在位置の角度を取得\n");
+            float sun_angle_from_camera = calculate_sun_angle(sunSensor_data[0], sunSensor_data[1], sunSensor_data[2], sunSensor_data[3]);
+
+            //NOTE: 光源と目標物の角度から動作角度を計算
+            printf("MAIN_LOOP: 光源と目標物の角度から動作角度を計算\n");
+            float move_angle = sun_angle_from_camera + sun_angle_from_target;//TODO: 角度計算正しいか？
+
+            for(int i = 0; i < 3; i++){
+                printf("MAIN_LOOP: モータを動作させる第%d回目\n", i);
+                pwm_right_cycle_asiAngle(move_angle);
+                sleep_ms(1000);
+
+                printf("MAIN_LOOP: 太陽センサのデータを取得第%d回目\n", i);
+                uint16_t sunSensor_data[4] = {0, 0, 0, 0};
+                for(int i = 0; i < 4; i++){
+                    sunSensor_data[i] = sunSensor_read(i);
+                }
+
+                //NOTE: 光源と目標物の角度を取得
+                printf("MAIN_LOOP: 光源と目標物の角度を取得第%d回目\n", i);
+                float sun_angle_from_camera = calculate_sun_angle(sunSensor_data[0], sunSensor_data[1], sunSensor_data[2], sunSensor_data[3]);
+
+                //NOTE: 光源と目標物の角度から動作角度を計算
+                printf("MAIN_LOOP: 光源と目標物の角度から動作角度を計算第%d回目\n", i);
+                move_angle = sun_angle_from_camera - sun_angle_from_target;
+            }
+
+            //TODO: カメラを撮影
+            printf("MAIN_LOOP: カメラを撮影\n");
+
+            //TODO: 撮影した画像をPCに送信
+            printf("MAIN_LOOP: 撮影した画像をPCに送信\n");
 
                 // Send the new total count in real-time if data connection is active
                 if (g_data_pcb != NULL) {
-                    char payload[16];
-                    sprintf(payload, "%d\n", g_total_blink_count);
+                    char payload[128];
+                    sprintf(payload, "%d,%d,%d,%d", sunSensor_data[0], sunSensor_data[1], sunSensor_data[2], sunSensor_data[3]);//NOTE: データ送信
                     
                     // lwip functions must be wrapped in this block for thread safety
                     cyw43_arch_lwip_begin();
@@ -166,6 +206,5 @@ int main() {
         }
         
         sleep_ms(1); // Small delay to yield the CPU
-    }
     return 0;
 }

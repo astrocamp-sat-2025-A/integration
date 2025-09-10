@@ -35,7 +35,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(astcan_wifi my_wifi_project/WiFi_picow_client.c)
+add_executable(astcan_wifi my_wifi_project/WiFi_picow_client.c PWM.c SunSensor.c)
 
 pico_set_program_name(astcan_wifi "astcan_wifi")
 pico_set_program_version(astcan_wifi "0.1")
@@ -61,6 +61,7 @@ target_link_libraries(astcan_wifi
         hardware_spi
         hardware_i2c
         hardware_pio
+        hardware_pwm
         pico_cyw43_arch_lwip_poll
         )
 
