@@ -3,6 +3,7 @@
 
 #include "pico/stdlib.h"
 #include "hardware/pwm.h"
+#include "stdio.h"
 
 #define PWM_PIN 11
 
@@ -21,6 +22,12 @@ void pwm_cycle_stop();
 void pwm_cycle_right_debug();
 void pwm_cycle_left_debug();
 
-void pwm_right_cycle_asiAngle(float angle);
+
+typedef enum {
+    RIGHT,
+    LEFT
+} type_right_or_left;
+
+void pwm_cycle_by_angle(float angle, type_right_or_left right_or_left);
 
 #endif

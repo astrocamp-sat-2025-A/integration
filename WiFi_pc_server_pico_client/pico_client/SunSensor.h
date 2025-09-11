@@ -2,6 +2,7 @@
 #define SUNSENSOR_H
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
+#include "stdio.h"
 
 #define SPI_PORT spi0
 #define PIN_MISO 16

@@ -30,7 +30,7 @@ struct tcp_pcb *g_data_pcb = NULL;
 
 
 //NOTE: 光源と目標物の角度の変数
-float sun_angle_from_target = 0;
+float sun_angle_from_target = 135.0;
 
 
 //NOTE: UARTの設定
@@ -45,6 +45,11 @@ float sun_angle_from_target = 0;
 #define PIN_CS   17
 #define PIN_SCK  18
 #define PIN_MOSI 19
+
+
+//NOTE: ifdefの定義, 本番直前に決める
+#define USE_SUN_SENSOR
+//#define NOT_USE_SUN_SENSOR
 
 
 // =================================================================
@@ -144,7 +149,9 @@ int main() {
     gpio_set_dir(PIN_CS, GPIO_OUT);
     gpio_put(PIN_CS, 1);  // 初期状態はHIGH（非アクティブ）
 
-    printf("Hello World\n");
+
+    //NOTE: pwmの初期化
+    initialisePwm();
 
     if (cyw43_arch_init()) {
         printf("Wi-Fi init failed\n");
@@ -173,8 +180,7 @@ int main() {
         if (g_start_blink_flag) {
             printf("MAIN_LOOP: Flag detected! Starting LED blink session.\n");
 
-            //NOTE: 任意の処理をここに書く
-
+            #ifdef USE_SUN_SENSOR
             printf("MAIN_LOOP: 太陽センサのデータを取得\n");
             uint16_t sunSensor_data[4] = {0, 0, 0, 0};
             for(int i = 0; i < 4; i++){
@@ -188,15 +194,14 @@ int main() {
 
             //NOTE: 光源と目標物の角度から動作角度を計算
             printf("MAIN_LOOP: 光源と目標物の角度から動作角度を計算\n");
-            float move_angle = sun_angle_from_camera + sun_angle_from_target;//TODO: 角度計算正しいか？
+            float move_angle = sun_angle_from_camera + sun_angle_from_target;
 
-            for(int i = 0; i < 3; i++){
+            for(int i = 0; i < 3; i++){//NOTE: ここの回数は決め打ち
                 printf("MAIN_LOOP: モータを動作させる第%d回目\n", i);
-                pwm_right_cycle_asiAngle(move_angle);
-                sleep_ms(1000);
+                pwm_cycle_by_angle(move_angle, RIGHT);//TODO: ここのRIGHT/LEFTは本番直前に決める
+                sleep_ms(5000);//NOTE: ここのdelayは必要かと思う、だいたい5秒経過すれば慣性は消える
 
                 printf("MAIN_LOOP: 太陽センサのデータを取得第%d回目\n", i);
-                uint16_t sunSensor_data[4] = {0, 0, 0, 0};
                 for(int i = 0; i < 4; i++){
                     sunSensor_data[i] = sunSensor_read(i);
                 }
@@ -209,6 +214,18 @@ int main() {
                 printf("MAIN_LOOP: 光源と目標物の角度から動作角度を計算第%d回目\n", i);
                 move_angle = sun_angle_from_camera - sun_angle_from_target;
             }
+            #endif
+
+            #ifdef NOT_USE_SUN_SENSOR
+            printf("MAIN_LOOP: 太陽センサを使用しない\n");
+            //NOTE: ランダム関数にて角度を生成する
+            for(int i = 0; i < 3; i++){
+                printf("MAIN_LOOP: モータを動作させる第%d回目\n", i);
+                float move_angle = rand() % 360;
+                pwm_cycle_by_angle(move_angle, RIGHT);
+            }
+            sleep_ms(5000);//NOTE: ここのdelayは必要かと思う、だいたい5秒経過すれば慣性は消える
+            #endif
 
             //TODO: カメラを撮影
             printf("MAIN_LOOP: カメラを撮影\n");
@@ -237,6 +254,6 @@ int main() {
             }
             g_start_blink_flag = 0; // Reset flag after the blinking session is complete
             printf("MAIN_LOOP: Blinking session finished.\n");
-        }    
+        }
         sleep_ms(1); // Small delay to yield the CPU
     }

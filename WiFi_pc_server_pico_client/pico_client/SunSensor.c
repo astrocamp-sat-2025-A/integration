@@ -42,7 +42,7 @@ uint16_t read_mcp3008(int ch) {
     return result;
 }
 
-//NOTE: 太陽センサより太陽方向の検出
+//NOTE: 太陽センサより太陽の有無を検出
 bool isSunValid() {
     int sum_sunSensor_data = 0;
     uint16_t sunSensor_data[4] = {0, 0, 0, 0};
@@ -105,6 +105,8 @@ float calculate_sun_angle(uint16_t ch0, uint16_t ch1, uint16_t ch2, uint16_t ch3
         if (clockwise_angle >= 360.0f) {
             clockwise_angle = 0.0f;
         }
+
+        printf("calculate_sun_angle: %f\n", clockwise_angle);
     
         return clockwise_angle;
 }
