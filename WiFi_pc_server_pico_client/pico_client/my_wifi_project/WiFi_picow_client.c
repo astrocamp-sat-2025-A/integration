@@ -8,6 +8,7 @@
 #include "hardware/uart.h"
 #include "hardware/spi.h"
 
+
 #include "SunSensor.h"
 #include "pwm.h"
 #include "ov7675.h"
@@ -32,8 +33,28 @@ int g_total_blink_count = 0;
 // Persistent connection handle (PCB) for the data channel
 struct tcp_pcb *g_data_pcb = NULL;
 
+// =================================================================
+// --- TCP_NODELAY Configuration Function ---
+// =================================================================
 
-
+/**
+ * @brief TCP_NODELAY設定を切り替える関数
+ * @param enable true: NODELAY有効（即座に送信）、false: NODELAY無効（Nagleアルゴリズム有効）
+ */
+void configure_tcp_nodelay(bool enable) {
+    if (g_data_pcb == NULL) {
+        printf("Error: No data connection available for TCP_NODELAY configuration\n");
+        return;
+    }
+    
+    if (enable) {
+        g_data_pcb->flags |= TF_NODELAY;
+        printf("TCP_NODELAY enabled (immediate transmission for real-time data)\n");
+    } else {
+        g_data_pcb->flags &= ~TF_NODELAY;
+        printf("TCP_NODELAY disabled (Nagle algorithm enabled for bulk data)\n");
+    }
+}
 
 //NOTE: 光源と目標物の角度の変数
 float sun_angle_from_target = 135.0;
@@ -259,6 +280,9 @@ int main() {
     sleep_ms(100); // Small delay to allow the network stack to process
     run_data_client();
 
+    // 基本設定：リアルタイムデータ用にNODELAY有効
+    configure_tcp_nodelay(true);
+
     while (true) {
         // This function is essential to keep the network stack running
         cyw43_arch_poll();
@@ -289,7 +313,7 @@ int main() {
             send_data_to_server(move_angle_payload);
 
             for(int i = 0; i < 3; i++){//NOTE: ここの回数は決め打ち
-                pwm_cycle_by_angle(move_angle, RIGHT);//TODO: ここのRIGHT/LEFTは本番直前に決める
+                pwm_cycle_by_angle(move_angle, LEFT);//TODO: ここのRIGHT/LEFTは本番直前に決める
                 sleep_ms(5000);//NOTE: ここのdelayは必要かと思う、だいたい5秒経過すれば慣性は消える
 
                 for(int i = 0; i < 4; i++){
@@ -310,7 +334,7 @@ int main() {
                 sprintf(move_angle_payload, "ANGLE:%f", move_angle);
                 send_data_to_server(move_angle_payload);
 
-                if(move_angle < 50 && move_angle > -50){
+                if(move_angle < 30 && move_angle > -30){
                     send_data_to_server("LOG: skip the loop");
                     break;
                 }
@@ -332,6 +356,8 @@ int main() {
             //TODO: カメラを撮影
             send_data_to_server("LOG: take a picture");
             if(g_capture_flag){ 
+                // 画像送信用：効率重視でNODELAY無効
+                configure_tcp_nodelay(false);
                  printf("MAIN_LOOP: Blinking session finished.\n"); 
                  printf("MAIN_LOOP: Flag detected! capture Start \n"); 
                  //TODO: カメラを撮影 
@@ -383,10 +409,8 @@ int main() {
                  printf("MAIN_LOOP: Blinking session finished.\n"); 
                      g_capture_flag = 0; // Reset flag after the blinking session is complete 
             } 
-
-            //TODO: 撮影した画像をPCに送信
-            send_data_to_server("LOG: send the picture to PC");
-
+            // 送信完了後：リアルタイムデータ用にNODELAY有効に戻す
+            configure_tcp_nodelay(true);
             }
             g_start_blink_flag = 0; // Reset flag after the blinking session is complete
             printf("MAIN_LOOP: Blinking session finished.\n");

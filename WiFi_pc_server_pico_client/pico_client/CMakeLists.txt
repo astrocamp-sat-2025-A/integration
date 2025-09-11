@@ -52,7 +52,8 @@ target_link_libraries(astcan_wifi
         pico_stdlib
         hardware_uart
         hardware_pwm
-        hardware_i2c)
+        hardware_i2c
+        )
 
 # Add the standard include files to the build
 target_include_directories(astcan_wifi PRIVATE

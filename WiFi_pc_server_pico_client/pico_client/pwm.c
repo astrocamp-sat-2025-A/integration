@@ -27,11 +27,11 @@ void pwm_cycle_right() {
 
     pwm_set_enabled(slice_num, true);
     pwm_set_chan_level(slice_num, PWM_CHAN_B, level_cw_ver2);
-    sleep_ms(1200);
+    sleep_ms(2000);
 
     pwm_set_enabled(slice_num, true);
     pwm_set_chan_level(slice_num, PWM_CHAN_B, level_ccw);
-    sleep_ms(600);
+    sleep_ms(1000);
 
     pwm_set_enabled(slice_num, false);
 }
@@ -47,7 +47,7 @@ void pwm_cycle_left() {
 
     pwm_set_enabled(slice_num, true);
     pwm_set_chan_level(slice_num, PWM_CHAN_B, level_ccw_ver2);
-    sleep_ms(1000);
+    sleep_ms(2000);
     pwm_set_enabled(slice_num, true);
     pwm_set_chan_level(slice_num, PWM_CHAN_B, level_cw);
     sleep_ms(1000);
