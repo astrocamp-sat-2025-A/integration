@@ -121,7 +121,30 @@ static void run_data_client(void) {
     cyw43_arch_lwip_end();
 }
 
+void send_data_to_server(const char* message) {
+    // データ接続が確立されていない場合は何もしない
+    if (g_data_pcb == NULL) {
+        return;
+    }
 
+    // 送信するペイロードを作成（メッセージ + 改行コード）
+    char payload[256];
+    int len = snprintf(payload, sizeof(payload), "%s\n", message);
+    if (len >= sizeof(payload)) {
+        printf("Error: Payload buffer too small for message: %s\n", message);
+        return;
+    }
+
+    // lwipの関数はスレッドセーフティのためにこのブロックで囲む
+    cyw43_arch_lwip_begin();
+    err_t err = tcp_write(g_data_pcb, payload, len, TCP_WRITE_FLAG_COPY);
+    if (err == ERR_OK) {
+        tcp_output(g_data_pcb); // データを即座に送信
+    } else {
+        printf("-> Failed to send data. Error: %d\n", err);
+    }
+    cyw43_arch_lwip_end();
+}
 // =================================================================
 // --- Main Program Logic ---
 // =================================================================
@@ -172,11 +195,13 @@ int main() {
         // Check if the flag has been set by the command receiver
         if (g_start_blink_flag) {
             printf("MAIN_LOOP: Flag detected! Starting LED blink session.\n");
+            send_data_to_server("LOG: Flag detected! Starting operation.");
 
             //NOTE: 任意の処理をここに書く
 
             printf("MAIN_LOOP: 太陽センサのデータを取得\n");
             uint16_t sunSensor_data[4] = {0, 0, 0, 0};
+            char data_payload[128]; 
             for(int i = 0; i < 4; i++){
                 sunSensor_data[i] = sunSensor_read(i);
             }
@@ -184,6 +209,8 @@ int main() {
             //NOTE: 光源と現在位置の角度を取得
             //TODO: 角度の基準正しいか？
             printf("MAIN_LOOP: 光源と現在位置の角度を取得\n");
+            send_data_to_server("LOG: Getting initial sun sensor data.");
+            
             float sun_angle_from_camera = calculate_sun_angle(sunSensor_data[0], sunSensor_data[1], sunSensor_data[2], sunSensor_data[3]);
 
             //NOTE: 光源と目標物の角度から動作角度を計算
