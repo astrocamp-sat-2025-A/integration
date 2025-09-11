@@ -27,11 +27,11 @@ void pwm_cycle_right() {
 
     pwm_set_enabled(slice_num, true);
     pwm_set_chan_level(slice_num, PWM_CHAN_B, level_cw_ver2);
-    sleep_ms(1500);
+    sleep_ms(1200);
 
     pwm_set_enabled(slice_num, true);
     pwm_set_chan_level(slice_num, PWM_CHAN_B, level_ccw);
-    sleep_ms(1000);
+    sleep_ms(600);
 
     pwm_set_enabled(slice_num, false);
 }
@@ -47,7 +47,7 @@ void pwm_cycle_left() {
 
     pwm_set_enabled(slice_num, true);
     pwm_set_chan_level(slice_num, PWM_CHAN_B, level_ccw_ver2);
-    sleep_ms(2000);
+    sleep_ms(1000);
     pwm_set_enabled(slice_num, true);
     pwm_set_chan_level(slice_num, PWM_CHAN_B, level_cw);
     sleep_ms(1000);
@@ -82,20 +82,42 @@ void pwm_cycle_left_debug() {
 }
 
 
-void pwm_right_cycle_asiAngle(float angle) {
+void pwm_cycle_by_angle(float angle, type_right_or_left right_or_left) {
     uint16_t level_cw = (wrap_value + 1) * level_cw_per / 100;
     uint16_t level_cw_ver2 = (wrap_value + 1) * level_cw_per_ver2 / 100;
     uint16_t level_ccw_ver2 = (wrap_value + 1) * level_ccw_per_ver2 / 100;
     uint16_t level_ccw = (wrap_value + 1) * level_ccw_per / 100;
 
-    if(angle > 0) {
-        //NOTE: 右回転, 1回の回転を15°とする
-        for(int i = 0; (float)i < (angle / 15); i++) {
-            pwm_cycle_right();
+
+    if(right_or_left == RIGHT) {
+        printf("pwm_RIGHT_cycle_by_angle: angle: %f\n", angle);
+        if(angle > 0) {
+            //NOTE: 右回転, 1回の回転を60°とする
+            for(int i = 0; i < (int)(angle / 60); i++) {
+                pwm_cycle_right();
+            }
+        }else{
+            //NOTE: 左回転の調子が悪いので右回転で頑張る
+            float new_angle = angle + 360;
+            for(int i = 0; i < (int)(new_angle / 60); i++) {
+                pwm_cycle_right();
+            }
         }
-    }else{
-        for(int i = 0; (float)i < (angle / 15); i++) {
-            pwm_cycle_left();
+    }else if(right_or_left == LEFT) {
+        printf("pwm_LEFT_cycle_by_angle: angle: %f\n", angle);
+        if(angle > 0) {
+            //NOTE: 左回転, 1回の回転を60°とする
+            float new_angle = 360 - angle;
+            for(int i = 0; i < (int)(angle / 60); i++) {
+                pwm_cycle_left();
+            }
+        }else{
+            //NOTE: 右回転の調子が悪いので左回転で頑張る
+            float new_angle = angle * -1;
+            for(int i = 0; i < (int)(new_angle / 60); i++) {
+                pwm_cycle_left();
+            }
         }
     }
 }
+
