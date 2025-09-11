@@ -5,6 +5,8 @@
 #include "pico/cyw43_arch.h"
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
+#include "hardware/uart.h"
+#include "hardware/spi.h"
 
 #include "SunSensor.h"
 #include "pwm.h"
@@ -29,6 +31,20 @@ struct tcp_pcb *g_data_pcb = NULL;
 
 //NOTE: 光源と目標物の角度の変数
 float sun_angle_from_target = 0;
+
+
+//NOTE: UARTの設定
+#define UART_ID uart0
+#define BAUD_RATE 115200
+#define UART_TX_PIN 12
+#define UART_RX_PIN 13
+
+//NOTE: SPIの設定
+#define SPI_PORT spi0
+#define PIN_MISO 16
+#define PIN_CS   17
+#define PIN_SCK  18
+#define PIN_MOSI 19
 
 
 // =================================================================
@@ -111,6 +127,24 @@ static void run_data_client(void) {
 // =================================================================
 int main() {
     stdio_init_all();
+
+    //NOTE: UARTの初期化
+    uart_init(UART_ID, BAUD_RATE);
+    gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
+    gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
+
+    //NOTE: SPIの初期化
+    spi_init(SPI_PORT, 500 * 1000);
+
+    gpio_set_function(PIN_MISO, GPIO_FUNC_SPI);
+    gpio_set_function(PIN_SCK, GPIO_FUNC_SPI);
+    gpio_set_function(PIN_MOSI, GPIO_FUNC_SPI);
+    
+    gpio_init(PIN_CS);
+    gpio_set_dir(PIN_CS, GPIO_OUT);
+    gpio_put(PIN_CS, 1);  // 初期状態はHIGH（非アクティブ）
+
+    printf("Hello World\n");
 
     if (cyw43_arch_init()) {
         printf("Wi-Fi init failed\n");
@@ -203,8 +237,6 @@ int main() {
             }
             g_start_blink_flag = 0; // Reset flag after the blinking session is complete
             printf("MAIN_LOOP: Blinking session finished.\n");
-        }
-        
+        }    
         sleep_ms(1); // Small delay to yield the CPU
-    return 0;
-}
+    }

@@ -44,12 +44,14 @@ pico_set_program_version(astcan_wifi "0.1")
 pico_generate_pio_header(astcan_wifi ${CMAKE_CURRENT_LIST_DIR}/blink.pio)
 
 # Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(astcan_wifi 0)
+pico_enable_stdio_uart(astcan_wifi 1)
 pico_enable_stdio_usb(astcan_wifi 1)
 
 # Add the standard library to the build
 target_link_libraries(astcan_wifi
-        pico_stdlib)
+        pico_stdlib
+        hardware_uart
+        hardware_pwm)
 
 # Add the standard include files to the build
 target_include_directories(astcan_wifi PRIVATE
@@ -61,7 +63,6 @@ target_link_libraries(astcan_wifi
         hardware_spi
         hardware_i2c
         hardware_pio
-        hardware_pwm
         pico_cyw43_arch_lwip_poll
         )
 
